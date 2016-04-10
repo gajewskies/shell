@@ -1,0 +1,252 @@
+#include <stdio.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <ctype.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#ifdef __cplusplus
+#else
+
+#define false 0
+#define true 1
+typedef int bool;
+
+/********************************************
+* Function to look up input comand against
+* the lookup for validity purposes
+*********************************************/
+bool functionLookup(char *argv, char *lookup[])
+{
+	puts("functionLookup\n");
+	bool match = false;
+	int i = 0;
+
+	for (i = 0; i < 10; i++)
+	{
+		if (*lookup[i] == *argv)
+		{
+			match = true;
+			break;
+		}
+	}
+	return match;
+}
+
+void parse(char *line, char **argv)
+{
+	puts("parse\n");
+	/* If we're not at the end of the line */
+	while (*line != '\0')
+	{
+		while (*line == ' '  || 
+			   *line == '\t' || 
+			   *line == '\n')
+		{
+			/* Replace white spaces with 0 */
+			*line++ = '\0';
+		}
+		/* Save the argument position */
+		*argv++ = line;
+
+		while (*line != '\0' &&
+			   *line != ' '  &&
+			   *line != '\t' &&
+			   *line != '\n')
+		{
+			/* Skip the argument until */
+			line++;
+		}
+	}
+	/* Mark the end of the argument list */
+	*argv = NULL;
+
+	puts("parseEND\n");
+}
+
+bool checkForwardSlash(char temp[], int size)
+{
+	puts("checkForwardSlash\n");
+	bool present = false;
+	int i = 0;
+
+	for (i = 0; i < size; ++i)
+	{
+		if (temp[i] == '/')
+		{
+			present = true;
+			break;
+		}
+	}
+	return present;
+}
+
+void execute(char **argv)
+{
+	puts("execute\n");
+	pid_t 	pid;
+	int 	status;
+
+	/* fork a child process */
+	if ((pid = fork()) < 0)
+	{
+		printf("[**] ERROR: forking child process failed\n");
+		exit(1);
+	}
+	/* for the child process */
+	else if (pid == 0)
+	{
+		/* execute the command*/
+		if (execvp(*argv, argv) < 0)
+		{
+			printf("[**] ERROR: exec failed\n");
+			exit(1);
+		}
+	}
+	/* for the parent */
+	else
+	{
+		while (wait(&status) != pid )
+		{
+			/* wait for complation */
+			;
+		}
+	}
+}
+
+int main(void)
+{
+	puts("main\n");
+	/* the input line */
+	char line[1024];
+
+	/* an array of pointers to the tokens
+	*  (the tokens were parsed from the input line)
+	*/
+	char *argv[3];
+
+	/* from the input line */
+	bool check1, check2 = false;
+
+	/* a lookup table that contains some of the valid
+	* commands 
+	*/
+	char *lookup[11] = 
+	{
+		"emacs", 
+		"kill", 
+		"bye", 
+		"jobs", 
+		"fg", 
+		"chmod", 
+		"cd", 
+		"help", 
+		"cat", 
+		"cp"
+	};
+
+	/* repeating */
+	while (true)
+	{
+		/* prompt */
+		printf("tish >> ");
+
+		/* read in the command */
+		gets(line);
+		puts("\n");
+
+		/* parse the line */
+		parse(line, argv);
+
+
+		/* exit if the user enter bye */
+		if (strcmp(argv[0], "bye") == 0)
+		{
+			exit(0);
+		}
+
+		/* input validation */
+
+		/* if the input is just a white space
+		* character, continue with the next 
+		* iteration of the loop
+		*/
+		puts("here\n");
+		// if (isspace(argv[0]))
+		// {
+		// 	 if it is some sort of white space
+		// 	* character, skip the curent iteration
+		// 	* of the while loop
+			
+		// 	continue;
+		// }
+
+		/* Call a function that checks for the 
+		* validity of the input command
+		*/
+		check2 = functionLookup(argv, lookup);
+		if (check2 == false)
+		{
+			printf("invalid command\n");
+			continue;
+		}
+
+        /* Test argv[0] for invalid internal 
+        * commands. Check for Letters and 
+        * Negative numbers.
+        */
+        if (strcmp(argv[1], "kill") == 0)
+        {
+        	if (isalpha(argv[1]) || atoi(argv[1]) < 0)
+        	{
+        		printf("invalid PID entered");
+        		printf("Enter a positive numeric number");
+        		continue;
+        	}
+        }
+
+        int size = sizeof(argv[1]) + 1;
+        char temp[size];
+
+        strcpy(temp, argv[1]);
+
+        check1 = checkForwardSlash(temp, size);
+
+        /* if true is retuend by the checkForwarSlash
+        * function skip the of the while loop
+        */
+		if (check1 == true)
+		{
+			printf("invalid file format\n");
+			printf("Avoid forward slashes in file name\n");
+			continue;
+		}
+
+		/* END input validation */
+		/* Signals to catch the control-c and control/
+		* combination 
+		*/
+		/* the instructio to ignore the SIGINT signal*/
+		signal(SIGINT, SIG_IGN);
+
+		/* SIGTERM signal must be caught */
+		signal(SIGTERM, SIG_DFL);
+
+		/*finally, execute the command */
+		execute(argv);
+	}
+	return 0;
+}
+
+#endif
+
+
+
+
+
+
+
+
+
+
